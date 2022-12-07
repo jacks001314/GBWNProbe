@@ -1,5 +1,5 @@
 project('GBWNProbe','c',
-    version: '1.0.0',
+    version: run_command(find_program('cat','more'),files('VERSION'),check:true).stdout().strip(),
     meson_version: '>=0.64.1',
     default_options: ['warning_level=3']
 )
