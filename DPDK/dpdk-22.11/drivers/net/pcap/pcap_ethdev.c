@@ -38,7 +38,7 @@
 
 #define ETH_PCAP_ARG_MAXLEN	64
 
-#define RTE_PMD_PCAP_MAX_QUEUES 16
+#define RTE_PMD_PCAP_MAX_QUEUES 1
 
 static char errbuf[PCAP_ERRBUF_SIZE];
 static struct timespec start_time;
@@ -273,6 +273,8 @@ eth_pcap_rx_infinite(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	return i;
 }
 
+
+
 static uint16_t
 eth_pcap_rx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 {
@@ -290,7 +292,7 @@ eth_pcap_rx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	pp = rte_eth_devices[pcap_q->port_id].process_private;
 	pcap = pp->rx_pcap[pcap_q->queue_id];
 
-	if (unlikely(pcap == NULL || nb_pkts == 0))
+	if (unlikely(nb_pkts == 0))
 		return 0;
 
 	/* Reads the given number of packets from the pcap file one by one
@@ -298,7 +300,8 @@ eth_pcap_rx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	 */
 	for (i = 0; i < nb_pkts; i++) {
 		/* Get the next PCAP packet */
-		packet = pcap_next(pcap, &header);
+		/* Get the next PCAP packet */
+		packet = rte_pcap_file_pool_read(fpool, &header);
 		if (unlikely(packet == NULL))
 			break;
 
@@ -644,17 +647,7 @@ eth_dev_start(struct rte_eth_dev *dev)
 	/* If not open already, open rx pcaps */
 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
 		rx = &internals->rx_queue[i];
-
-		if (pp->rx_pcap[i] != NULL)
-			continue;
-
-		if (strcmp(rx->type, ETH_PCAP_RX_PCAP_ARG) == 0) {
-			if (open_single_rx_pcap(rx->name, &pp->rx_pcap[i]) < 0)
-				return -1;
-		} else if (strcmp(rx->type, ETH_PCAP_RX_IFACE_ARG) == 0) {
-			if (open_single_iface(rx->name, &pp->rx_pcap[i]) < 0)
-				return -1;
-		}
+		rte_pcap_file_pool_init(&rx->fpool,rx->name);
 	}
 
 status_up:
@@ -705,11 +698,9 @@ eth_dev_stop(struct rte_eth_dev *dev)
 	}
 
 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
-		if (pp->rx_pcap[i] != NULL) {
-			queue_missed_stat_on_stop_update(dev, i);
-			pcap_close(pp->rx_pcap[i]);
-			pp->rx_pcap[i] = NULL;
-		}
+		rx = &internals->rx_queue[i];
+
+        rte_pcap_file_pool_init(&rx->fpool,rx->name);
 	}
 
 status_down:
@@ -1017,8 +1008,8 @@ add_queue(struct pmd_devargs *pmd, const char *name, const char *type,
 {
 	if (pmd->num_of_queue >= RTE_PMD_PCAP_MAX_QUEUES)
 		return -1;
-	if (pcap)
-		pmd->queue[pmd->num_of_queue].pcap = pcap;
+	//if (pcap)
+	pmd->queue[pmd->num_of_queue].pcap = pcap;
 	if (dumper)
 		pmd->queue[pmd->num_of_queue].dumper = dumper;
 	pmd->queue[pmd->num_of_queue].name = name;
@@ -1036,13 +1027,13 @@ open_rx_pcap(const char *key, const char *value, void *extra_args)
 {
 	const char *pcap_filename = value;
 	struct pmd_devargs *rx = extra_args;
-	pcap_t *pcap = NULL;
+	//pcap_t *pcap = NULL;
 
-	if (open_single_rx_pcap(pcap_filename, &pcap) < 0)
-		return -1;
+	//if (open_single_rx_pcap(pcap_filename, &pcap) < 0)
+	//	return -1;
 
-	if (add_queue(rx, pcap_filename, key, pcap, NULL) < 0) {
-		pcap_close(pcap);
+	if (add_queue(rx, pcap_filename, key, NULL, NULL) < 0) {
+		//pcap_close(pcap);
 		return -1;
 	}
 
