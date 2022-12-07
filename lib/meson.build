@@ -62,3 +62,6 @@ sources = files(
     'gbw_string.c',
     'gbw_strtok.c'
 )
+
+common_lib = static_library('common',
+                        sources)
